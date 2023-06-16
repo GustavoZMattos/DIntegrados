@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 
 namespace DIntegrados.Controllers
 {
@@ -120,8 +122,25 @@ namespace DIntegrados.Controllers
 
         private async Task SendDataToServer(List<float> data)
         {
-            string apiUrl = "https://localhost:44321" + Url.Action("ReconstructImage", "Imagem"); // URL do servidor de reconstrução
-            await _httpClient.PostAsJsonAsync(apiUrl, data);
+            using (var httpClient = new HttpClient())
+            {
+                // Configure a URL do endpoint do controller
+                var url = "https://localhost:44321" + Url.Action("ReconstructImage", "Imagem");
+                var conteudo = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+                var xxx = conteudo.ReadAsStringAsync();
+                // Envie a requisição POST para o endpoint
+                var response = await httpClient.PostAsync(url, conteudo);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // Requisição bem-sucedida
+                }
+                else
+                {
+                    // Requisição falhou
+
+                }
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿@using System.Net.Http;
 @using System.Text;
 @using System.Threading;
+@using Newtonsoft.Json;
 
 @{
     ViewData["Title"] = "Home Page";
@@ -15,24 +16,31 @@
 @{
     for (int i = 0; i < 10; i++)
     {
-        List<string> minhaLista = new List<string>
+        List<string> sinal = new List<string>
         {
-            "String 1",
-            "String 2",
-            "String 3",
-            "String 4",
-            "String 5"
+            "G-1",
+            "G-2",
+            "A-60x60-1",
+            "g-30x30-1",
+            "g-30x30-2",
+            "A-30x30-1"
+        };
+
+        List<string> algoritimo = new List<string>
+        {
+            "CGNE",
+            "CGNR"
         };
 
         var random = new Random();
-        int indiceAleatorio = random.Next(minhaLista.Count);
-        string stringAleatoria = minhaLista[indiceAleatorio];
+        int indiceAleatorio = random.Next(sinal.Count);
+        string stringAleatoria = sinal[indiceAleatorio];
         // Crie uma instância do HttpClient
         using (var httpClient = new HttpClient())
         {
             // Configure a URL do endpoint do controller
             var url = "https://localhost:44321" + Url.Action("SendData", "Usuario");
-            var conteudo = new StringContent(stringAleatoria, Encoding.UTF8, "application/json");
+            var conteudo = new StringContent(JsonConvert.SerializeObject(stringAleatoria), Encoding.UTF8, "application/json");
 
             // Envie a requisição POST para o endpoint
             var response = await httpClient.PostAsync(url, conteudo);

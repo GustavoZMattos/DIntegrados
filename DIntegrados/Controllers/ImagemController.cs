@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
+using System.Threading.Tasks;
 using DotNumerics.LinearAlgebra;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -92,10 +93,11 @@ namespace DIntegrados.Controllers
                 return View();
             }
         }
+
         [HttpPost]
-        public IActionResult ReconstructImage(List<float> data, int size)
+        public async Task<IActionResult> ReconstructImage([FromBody] List<float> data)
         {
-            float[] reconstructedImage = ReconstructImageData(data, size); // Reconstrói a imagem
+            float[] reconstructedImage = ReconstructImageData(data, data.Count); // Reconstrói a imagem
             SaveImage(reconstructedImage); // Salva a imagem
             return Ok();
         }
