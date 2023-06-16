@@ -93,11 +93,13 @@ namespace DIntegrados.Controllers
                 return View();
             }
         }
-        public async Task<IActionResult> SendData()
+
+        [HttpPost]
+        public async Task<IActionResult> SendData([FromBody] string g)
         {
-            List<float> data = CarregarImagem("G-1"); // Gera uma sequência de List<float> aleatória
-            await SendDataToServer(data); // Envia os dados para o servidor
-            return RedirectToAction("Index");
+            List<float> data = CarregarImagem(g);
+            await SendDataToServer(data);
+            return Ok();
         }
 
         private List<float> CarregarImagem(string g)
@@ -118,7 +120,7 @@ namespace DIntegrados.Controllers
 
         private async Task SendDataToServer(List<float> data)
         {
-            string apiUrl = "http://localhost:5000/api/reconstruction"; // URL do servidor de reconstrução
+            string apiUrl = "https://localhost:44321" + Url.Action("ReconstructImage", "Imagem"); // URL do servidor de reconstrução
             await _httpClient.PostAsJsonAsync(apiUrl, data);
         }
     }

@@ -1,4 +1,8 @@
-﻿@{
+﻿@using System.Net.Http;
+@using System.Text;
+@using System.Threading;
+
+@{
     ViewData["Title"] = "Home Page";
 }
 
@@ -7,3 +11,42 @@
         <p>Hello, world! The time on the server is @DateTime.Now</p>
         <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
     </div>
+
+@{
+    for (int i = 0; i < 10; i++)
+    {
+        List<string> minhaLista = new List<string>
+        {
+            "String 1",
+            "String 2",
+            "String 3",
+            "String 4",
+            "String 5"
+        };
+
+        var random = new Random();
+        int indiceAleatorio = random.Next(minhaLista.Count);
+        string stringAleatoria = minhaLista[indiceAleatorio];
+        // Crie uma instância do HttpClient
+        using (var httpClient = new HttpClient())
+        {
+            // Configure a URL do endpoint do controller
+            var url = "https://localhost:44321" + Url.Action("SendData", "Usuario");
+            var conteudo = new StringContent(stringAleatoria, Encoding.UTF8, "application/json");
+
+            // Envie a requisição POST para o endpoint
+            var response = await httpClient.PostAsync(url, conteudo);
+
+            // Verifique se a requisição foi bem-sucedida
+            if (response.IsSuccessStatusCode)
+            {
+                // Requisição bem-sucedida, faça algo aqui se necessário
+            }
+            else
+            {
+                // Requisição falhou, trate o erro aqui se necessário
+            }
+        }
+        Thread.Sleep(random.Next(60000));
+    }
+}
