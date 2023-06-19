@@ -10,6 +10,7 @@
     <div class="text-center">
         <h1 class="display-4">Welcome</h1>
         <p>Hello, world! The time on the server is @DateTime.Now</p>
+        <p>Relatórios Gerados</p>
         <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
     </div>
 
@@ -33,28 +34,27 @@
         };
 
         var random = new Random();
-        int indiceAleatorio = random.Next(sinal.Count);
-        string stringAleatoria = sinal[indiceAleatorio];
+        int indiceAleatorioSinal = random.Next(sinal.Count);
+        int indiceAleatorioAlg = random.Next(algoritimo.Count);
+
+        var data = new
+        {
+            G = sinal[indiceAleatorioSinal],
+            Agoritimo = algoritimo[indiceAleatorioAlg]
+        };
+
         // Crie uma instância do HttpClient
         using (var httpClient = new HttpClient())
         {
             // Configure a URL do endpoint do controller
             var url = "https://localhost:44321" + Url.Action("SendData", "Usuario");
-            var conteudo = new StringContent(JsonConvert.SerializeObject(stringAleatoria), Encoding.UTF8, "application/json");
+            var conteudo = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
+
+            //StringContent($"evento={evento}&data={data}", Encoding.UTF8, "application/x-www-form-urlencoded")
 
             // Envie a requisição POST para o endpoint
-            var response = await httpClient.PostAsync(url, conteudo);
-
-            // Verifique se a requisição foi bem-sucedida
-            if (response.IsSuccessStatusCode)
-            {
-                // Requisição bem-sucedida, faça algo aqui se necessário
-            }
-            else
-            {
-                // Requisição falhou, trate o erro aqui se necessário
-            }
+            var response = httpClient.PostAsync(url, conteudo);
         }
-        Thread.Sleep(random.Next(60000));
+        Thread.Sleep(random.Next(10000));
     }
 }

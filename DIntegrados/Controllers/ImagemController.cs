@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.Threading.Tasks;
 using DotNumerics.LinearAlgebra;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,7 +14,13 @@ namespace DIntegrados.Controllers
     public class ImagemController : Controller
     {
         private Matrix H, g, x;
-        
+        private readonly IWebHostEnvironment _env;
+
+        public ImagemController(IWebHostEnvironment env)
+        {
+            _env = env;
+        }
+
         // GET: Imagem
         public ActionResult Index()
         {
@@ -95,46 +103,74 @@ namespace DIntegrados.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> ReconstructImage([FromBody] List<float> data)
+        public IActionResult ReconstructImage([FromBody] ModeloRecebeServer data)
         {
-            float[] reconstructedImage = ReconstructImageData(data, data.Count); // Reconstrói a imagem
-            SaveImage(reconstructedImage); // Salva a imagem
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+            Matrix reconstructedImage = ReconstructImageData(data.Sinal, data.Agoritimo); // Reconstrói a imagem
+            stopwatch.Stop();
+            SaveImage(reconstructedImage, data.Agoritimo, stopwatch.Elapsed.TotalMinutes); // Salva a imagem
             return Ok();
         }
 
-        private float[] ReconstructImageData(List<float> data, int size)
+        private Matrix ReconstructImageData(List<float> data, string alg)
         {
-            H = new Matrix(50816, 3600);
-            string path = @"C:\Users\a1762680\Downloads\H-1.csv";
+            int lin, col, s, n;
+            if (data.Count == 50816)
+            {
+                lin = 50816;
+                col = 3600;
+                s = 794;
+                n = 64;
+            }
+            else
+            {
+                lin = 27904;
+                col = 900;
+                s = 436;
+                n = 64;
+            }
+            H = new Matrix(lin, col);
+            string path = $"{_env.ContentRootPath}\\Data\\Arquivos\\H-1.csv";
             System.IO.StreamReader file = new System.IO.StreamReader(path);
-            for (int i = 0; i < 50816; i++)
+            for (int i = 0; i < lin; i++)
             {
                 string[] bufferA = file.ReadLine().Split(',');
-                for (int j = 0; j < 3600; j++)
+                for (int j = 0; j < col; j++)
                     if (!String.IsNullOrWhiteSpace(bufferA[j]))
                         H[i, j] = float.Parse(bufferA[j], CultureInfo.InvariantCulture);
             }
             file.Close();
 
-            float[] ultravector = SoundGain(794, 64, data);
+            float[] ultravector = SoundGain(s, n, data);
 
-            return ultravector;
-        }
-
-        private void SaveImage(float[] ultravector)
-        {
-            g = new Matrix(50816, 1);
-            for (int i = 0; i < 50816; i++)//constroi matrix do vetor de entrada
+            g = new Matrix(lin, 1);
+            for (int i = 0; i < lin; i++)//constroi matrix do vetor de entrada
             {
                 g[i, 0] = ultravector[i];
             }
 
-            CGNR(H, g, out x);
+            if (alg == "CGNR")
+                CGNR(H, g, out x);
+            else if (alg == "CGNE")
+                CGNE(H, g, out x);
+            else
+                return x = new Matrix(1, 1);
 
+            return x;
+        }
+
+        private void SaveImage(Matrix x, string alg, double tempo)
+        {
             //Parte que atribui valor de 0 até 255 para a imagem
-            Bitmap bmp = new Bitmap(60, 60);
+            int tam;
+            if (x.RowCount == 3600)
+                tam = 60;
+            else
+                tam = 30;
+            Bitmap bmp = new Bitmap(tam, tam);
             double max = double.NegativeInfinity, min = double.PositiveInfinity;
-            for (int i = 0; i < 3600; i++)//Calcula valor máximo e mínimo da imagem
+            for (int i = 0; i < x.RowCount; i++)//Calcula valor máximo e mínimo da imagem
             {
                 if (x[i, 0] > max)
                     max = x[i, 0];
@@ -143,14 +179,14 @@ namespace DIntegrados.Controllers
             }
             int k = 0;
             int value;
-            for (int i = 0; i < 60; i++)
-                for (int j = 0; j < 60; j++)
+            for (int i = 0; i < tam; i++)
+                for (int j = 0; j < tam; j++)
                 {
                     value = (int)((255 / (max - min)) * (x[k, 0] - min));
                     bmp.SetPixel(i, j, Color.FromArgb(value, value, value));
                     k++;
                 }
-            bmp.Save(@"C:\Users\a1762680\Downloads\imgteste.bmp");
+            bmp.Save($"{_env.ContentRootPath}\\Data\\Imagens\\{alg}imgU{User.Identity.Name}Tam{tam}Temp{tempo}I.bmp");
         }
 
         static float[] SoundGain(int l, int c, IList<float> sinal)
@@ -216,8 +252,8 @@ namespace DIntegrados.Controllers
          */
         static void CGNE(Matrix H, Matrix g, out Matrix f)
         {
-            f = new Matrix(3600, 1);
-            for (int i = 0; i < 3600; i++)//f0=0
+            f = new Matrix(H.ColumnCount, 1);
+            for (int i = 0; i < H.ColumnCount; i++)//f0=0
             {
                 f[i, 0] = 0;
             }
@@ -245,8 +281,8 @@ namespace DIntegrados.Controllers
 
         static void CGNR(Matrix H, Matrix g, out Matrix f)
         {
-            f = new Matrix(3600, 1);
-            for (int i = 0; i < 3600; i++)//f0=0
+            f = new Matrix(H.ColumnCount, 1);
+            for (int i = 0; i < H.ColumnCount; i++)//f0=0
             {
                 f[i, 0] = 0;
             }
@@ -270,6 +306,12 @@ namespace DIntegrados.Controllers
                 calculoErro = Math.Abs(norm2(ri) - norm2(r));
                 count++;
             } while (calculoErro > 0.0003f && count < 15);
+        }
+
+        public class ModeloRecebeServer
+        {
+            public List<float> Sinal { get; set; }
+            public string Agoritimo { get; set; }
         }
     }
 }
