@@ -46,6 +46,7 @@
         // Crie uma instância do HttpClient
         using (var httpClient = new HttpClient())
         {
+            //httpClient.Timeout = TimeSpan.FromSeconds(300);
             // Configure a URL do endpoint do controller
             var url = "https://localhost:44321" + Url.Action("SendData", "Usuario");
             var conteudo = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
@@ -53,7 +54,7 @@
             //StringContent($"evento={evento}&data={data}", Encoding.UTF8, "application/x-www-form-urlencoded")
 
             // Envie a requisição POST para o endpoint
-            var response = httpClient.PostAsync(url, conteudo);
+            var response =  await httpClient.PostAsync(url, conteudo);
         }
         Thread.Sleep(random.Next(10000));
     }

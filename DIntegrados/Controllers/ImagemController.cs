@@ -107,13 +107,13 @@ namespace DIntegrados.Controllers
         {
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
-            Matrix reconstructedImage = ReconstructImageData(data.Sinal, data.Agoritimo); // Reconstrói a imagem
+            ReconstructImageData(data.Sinal, data.Agoritimo.Split(' ')[0], out Matrix reconstructedImage, out int count); // Reconstrói a imagem
             stopwatch.Stop();
-            SaveImage(reconstructedImage, data.Agoritimo, stopwatch.Elapsed.TotalMinutes); // Salva a imagem
+            SaveImage(reconstructedImage, data.Agoritimo, stopwatch.Elapsed.TotalSeconds, count); // Salva a imagem
             return Ok();
         }
 
-        private Matrix ReconstructImageData(List<float> data, string alg)
+        private void ReconstructImageData(List<float> data, string alg, out Matrix x, out int count)
         {
             int lin, col, s, n;
             if (data.Count == 50816)
@@ -151,16 +151,17 @@ namespace DIntegrados.Controllers
             }
 
             if (alg == "CGNR")
-                CGNR(H, g, out x);
+                CGNR(H, g, out x, out count);
             else if (alg == "CGNE")
-                CGNE(H, g, out x);
+                CGNE(H, g, out x, out count);
             else
-                return x = new Matrix(1, 1);
-
-            return x;
+            {
+                x = new Matrix(1, 1);
+                count = 1;
+            }
         }
 
-        private void SaveImage(Matrix x, string alg, double tempo)
+        private void SaveImage(Matrix x, string alg, double tempo, int count)
         {
             //Parte que atribui valor de 0 até 255 para a imagem
             int tam;
@@ -186,7 +187,7 @@ namespace DIntegrados.Controllers
                     bmp.SetPixel(i, j, Color.FromArgb(value, value, value));
                     k++;
                 }
-            bmp.Save($"{_env.ContentRootPath}\\Data\\Imagens\\{alg}imgU{User.Identity.Name}Tam{tam}Temp{tempo}I.bmp");
+            bmp.Save($"{_env.ContentRootPath}\\Data\\Imagens\\Img{alg} U{User.Identity.Name} Tam{tam} Temp{Math.Round(tempo)} I{count}.bmp");
         }
 
         static float[] SoundGain(int l, int c, IList<float> sinal)
@@ -250,7 +251,7 @@ namespace DIntegrados.Controllers
          * O tamanho 50816 vem do tamannho do vetor de entrada
          * O tamanho 3600 vem do tamanho da imagem final (60X60)
          */
-        static void CGNE(Matrix H, Matrix g, out Matrix f)
+        static void CGNE(Matrix H, Matrix g, out Matrix f, out int count)
         {
             f = new Matrix(H.ColumnCount, 1);
             for (int i = 0; i < H.ColumnCount; i++)//f0=0
@@ -263,7 +264,7 @@ namespace DIntegrados.Controllers
             double rtXr = (r.Transpose() * r)[0, 0]; //=riT * ri serve pra não precisar calcular duas vezes
             double ritXri;//=ri+1T * ri+1 serve pra não precisar calcular duas vezes
             Matrix ri;// ri+1
-            int count = 0;
+            count = 0;
             do //Falta timer
             {
                 a = rtXr / (p.Transpose() * p)[0, 0];//ai = riT * ri / piT * pi
@@ -279,7 +280,7 @@ namespace DIntegrados.Controllers
             } while (calculoErro > 0.0003f && count < 15);
         }
 
-        static void CGNR(Matrix H, Matrix g, out Matrix f)
+        static void CGNR(Matrix H, Matrix g, out Matrix f, out int count)
         {
             f = new Matrix(H.ColumnCount, 1);
             for (int i = 0; i < H.ColumnCount; i++)//f0=0
@@ -290,7 +291,7 @@ namespace DIntegrados.Controllers
             Matrix zi = MatrixMultTranpose(H, r); //z0 = Ht * r0
             Matrix p = zi; //p0 = HTr0
             double a, B, calculoErro;
-            int count = 0;
+            count = 0;
             double rtXr = (r.Transpose() * r)[0, 0]; //=riT * ri serve pra não precisar calcular duas vezes
             Matrix ri, w, z;// ri+1
             do //Falta timer

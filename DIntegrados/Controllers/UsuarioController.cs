@@ -107,7 +107,7 @@ namespace DIntegrados.Controllers
         public async Task<IActionResult> SendData([FromBody] ModeloRecebeUser modelo)
         {
             List<float> data = CarregarImagem(modelo.G);
-            await SendDataToServer(data, modelo.Agoritimo);
+            await SendDataToServer(data, modelo.Agoritimo + " " + modelo.G);
             return Ok();
         }
 
