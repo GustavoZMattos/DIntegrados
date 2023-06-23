@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
@@ -14,6 +15,12 @@ namespace DIntegrados.Controllers
     public class UsuarioController : Controller
     {
         private readonly HttpClient _httpClient;
+        private readonly IWebHostEnvironment _env;
+
+        public UsuarioController(IWebHostEnvironment env)
+        {
+            _env = env;
+        }
 
         // GET: Usuario
         public ActionResult Index()
@@ -97,17 +104,17 @@ namespace DIntegrados.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> SendData([FromBody] string g)
+        public async Task<IActionResult> SendData([FromBody] ModeloRecebeUser modelo)
         {
-            List<float> data = CarregarImagem(g);
-            await SendDataToServer(data);
+            List<float> data = CarregarImagem(modelo.G);
+            await SendDataToServer(data, modelo.Agoritimo + " " + modelo.G);
             return Ok();
         }
 
         private List<float> CarregarImagem(string g)
         {
             var ultrasound = new List<float>();
-            string path = @"C:\Users\a1762680\Downloads\" + g + ".csv";
+            string path = $"{_env.ContentRootPath}\\Data\\Arquivos\\{g}.csv";
             string[] buffer = System.IO.File.ReadAllText(path).Split('\n');
             ultrasound = new List<float>();
             foreach (string number in buffer)
@@ -120,8 +127,14 @@ namespace DIntegrados.Controllers
             return ultrasound;
         }
 
-        private async Task SendDataToServer(List<float> data)
+        private async Task SendDataToServer(List<float> sinal, string alg)
         {
+            var data = new
+            {
+                Sinal = sinal,
+                Agoritimo = alg
+            };
+
             using (var httpClient = new HttpClient())
             {
                 // Configure a URL do endpoint do controller
@@ -141,6 +154,11 @@ namespace DIntegrados.Controllers
 
                 }
             }
+        }
+        public class ModeloRecebeUser
+        {
+            public string G { get; set; }
+            public string Agoritimo { get; set; }
         }
     }
 }

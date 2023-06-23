@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 using System.Threading.Tasks;
 using DotNumerics.LinearAlgebra;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,7 +14,13 @@ namespace DIntegrados.Controllers
     public class ImagemController : Controller
     {
         private Matrix H, g, x;
-        
+        private readonly IWebHostEnvironment _env;
+
+        public ImagemController(IWebHostEnvironment env)
+        {
+            _env = env;
+        }
+
         // GET: Imagem
         public ActionResult Index()
         {
@@ -95,46 +103,75 @@ namespace DIntegrados.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> ReconstructImage([FromBody] List<float> data)
+        public IActionResult ReconstructImage([FromBody] ModeloRecebeServer data)
         {
-            float[] reconstructedImage = ReconstructImageData(data, data.Count); // Reconstrói a imagem
-            SaveImage(reconstructedImage); // Salva a imagem
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+            ReconstructImageData(data.Sinal, data.Agoritimo.Split(' ')[0], out Matrix reconstructedImage, out int count); // Reconstrói a imagem
+            stopwatch.Stop();
+            SaveImage(reconstructedImage, data.Agoritimo, stopwatch.Elapsed.TotalSeconds, count); // Salva a imagem
             return Ok();
         }
 
-        private float[] ReconstructImageData(List<float> data, int size)
+        private void ReconstructImageData(List<float> data, string alg, out Matrix x, out int count)
         {
-            H = new Matrix(50816, 3600);
-            string path = @"C:\Users\a1762680\Downloads\H-1.csv";
+            int lin, col, s, n;
+            if (data.Count == 50816)
+            {
+                lin = 50816;
+                col = 3600;
+                s = 794;
+                n = 64;
+            }
+            else
+            {
+                lin = 27904;
+                col = 900;
+                s = 436;
+                n = 64;
+            }
+            H = new Matrix(lin, col);
+            string path = $"{_env.ContentRootPath}\\Data\\Arquivos\\H-1.csv";
             System.IO.StreamReader file = new System.IO.StreamReader(path);
-            for (int i = 0; i < 50816; i++)
+            for (int i = 0; i < lin; i++)
             {
                 string[] bufferA = file.ReadLine().Split(',');
-                for (int j = 0; j < 3600; j++)
+                for (int j = 0; j < col; j++)
                     if (!String.IsNullOrWhiteSpace(bufferA[j]))
                         H[i, j] = float.Parse(bufferA[j], CultureInfo.InvariantCulture);
             }
             file.Close();
 
-            float[] ultravector = SoundGain(794, 64, data);
+            float[] ultravector = SoundGain(s, n, data);
 
-            return ultravector;
-        }
-
-        private void SaveImage(float[] ultravector)
-        {
-            g = new Matrix(50816, 1);
-            for (int i = 0; i < 50816; i++)//constroi matrix do vetor de entrada
+            g = new Matrix(lin, 1);
+            for (int i = 0; i < lin; i++)//constroi matrix do vetor de entrada
             {
                 g[i, 0] = ultravector[i];
             }
 
-            CGNR(H, g, out x);
+            if (alg == "CGNR")
+                CGNR(H, g, out x, out count);
+            else if (alg == "CGNE")
+                CGNE(H, g, out x, out count);
+            else
+            {
+                x = new Matrix(1, 1);
+                count = 1;
+            }
+        }
 
+        private void SaveImage(Matrix x, string alg, double tempo, int count)
+        {
             //Parte que atribui valor de 0 até 255 para a imagem
-            Bitmap bmp = new Bitmap(60, 60);
+            int tam;
+            if (x.RowCount == 3600)
+                tam = 60;
+            else
+                tam = 30;
+            Bitmap bmp = new Bitmap(tam, tam);
             double max = double.NegativeInfinity, min = double.PositiveInfinity;
-            for (int i = 0; i < 3600; i++)//Calcula valor máximo e mínimo da imagem
+            for (int i = 0; i < x.RowCount; i++)//Calcula valor máximo e mínimo da imagem
             {
                 if (x[i, 0] > max)
                     max = x[i, 0];
@@ -143,14 +180,14 @@ namespace DIntegrados.Controllers
             }
             int k = 0;
             int value;
-            for (int i = 0; i < 60; i++)
-                for (int j = 0; j < 60; j++)
+            for (int i = 0; i < tam; i++)
+                for (int j = 0; j < tam; j++)
                 {
                     value = (int)((255 / (max - min)) * (x[k, 0] - min));
                     bmp.SetPixel(i, j, Color.FromArgb(value, value, value));
                     k++;
                 }
-            bmp.Save(@"C:\Users\a1762680\Downloads\imgteste.bmp");
+            bmp.Save($"{_env.ContentRootPath}\\Data\\Imagens\\Img{alg} U{User.Identity.Name} Tam{tam} Temp{Math.Round(tempo)} I{count}.bmp");
         }
 
         static float[] SoundGain(int l, int c, IList<float> sinal)
@@ -214,10 +251,10 @@ namespace DIntegrados.Controllers
          * O tamanho 50816 vem do tamannho do vetor de entrada
          * O tamanho 3600 vem do tamanho da imagem final (60X60)
          */
-        static void CGNE(Matrix H, Matrix g, out Matrix f)
+        static void CGNE(Matrix H, Matrix g, out Matrix f, out int count)
         {
-            f = new Matrix(3600, 1);
-            for (int i = 0; i < 3600; i++)//f0=0
+            f = new Matrix(H.ColumnCount, 1);
+            for (int i = 0; i < H.ColumnCount; i++)//f0=0
             {
                 f[i, 0] = 0;
             }
@@ -227,7 +264,7 @@ namespace DIntegrados.Controllers
             double rtXr = (r.Transpose() * r)[0, 0]; //=riT * ri serve pra não precisar calcular duas vezes
             double ritXri;//=ri+1T * ri+1 serve pra não precisar calcular duas vezes
             Matrix ri;// ri+1
-            int count = 0;
+            count = 0;
             do //Falta timer
             {
                 a = rtXr / (p.Transpose() * p)[0, 0];//ai = riT * ri / piT * pi
@@ -243,10 +280,10 @@ namespace DIntegrados.Controllers
             } while (calculoErro > 0.0003f && count < 15);
         }
 
-        static void CGNR(Matrix H, Matrix g, out Matrix f)
+        static void CGNR(Matrix H, Matrix g, out Matrix f, out int count)
         {
-            f = new Matrix(3600, 1);
-            for (int i = 0; i < 3600; i++)//f0=0
+            f = new Matrix(H.ColumnCount, 1);
+            for (int i = 0; i < H.ColumnCount; i++)//f0=0
             {
                 f[i, 0] = 0;
             }
@@ -254,7 +291,7 @@ namespace DIntegrados.Controllers
             Matrix zi = MatrixMultTranpose(H, r); //z0 = Ht * r0
             Matrix p = zi; //p0 = HTr0
             double a, B, calculoErro;
-            int count = 0;
+            count = 0;
             double rtXr = (r.Transpose() * r)[0, 0]; //=riT * ri serve pra não precisar calcular duas vezes
             Matrix ri, w, z;// ri+1
             do //Falta timer
@@ -270,6 +307,12 @@ namespace DIntegrados.Controllers
                 calculoErro = Math.Abs(norm2(ri) - norm2(r));
                 count++;
             } while (calculoErro > 0.0003f && count < 15);
+        }
+
+        public class ModeloRecebeServer
+        {
+            public List<float> Sinal { get; set; }
+            public string Agoritimo { get; set; }
         }
     }
 }

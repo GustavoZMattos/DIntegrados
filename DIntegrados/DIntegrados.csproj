@@ -18,6 +18,11 @@
     <PackageReference Include="System.Net.Http.Json" Version="5.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Data\Imagens\" />
+    <Folder Include="Data\Arquivos\" />
+  </ItemGroup>
+
 
 
 </Project>
