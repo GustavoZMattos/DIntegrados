@@ -7,17 +7,16 @@
     ViewData["Title"] = "Home Page";
 }
 
-    <div class="text-center">
-        <h1 class="display-4">Welcome</h1>
-        <p>Hello, world! The time on the server is @DateTime.Now</p>
-        <p>Relatórios Gerados</p>
-        <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-    </div>
+<div class="text-center">
+    <h1 class="display-4">Gerando imagens ...</h1>
+    <p>Hello, world! The time on the server is @DateTime.Now</p>
+    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+</div>
 
 @{
     var tasks = new List<Task>();
 
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 10; i++)
     {
         List<string> sinal = new List<string>
         {
@@ -47,17 +46,14 @@
 
         // Crie uma instância do HttpClient
         var httpClient = new HttpClient();
-        
-            //httpClient.Timeout = TimeSpan.FromSeconds(300);
-            // Configure a URL do endpoint do controller
-            var url = "https://localhost:44321" + Url.Action("SendData", "Usuario");
-            var conteudo = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
-            //StringContent($"evento={evento}&data={data}", Encoding.UTF8, "application/x-www-form-urlencoded")
+        // Configure a URL do endpoint do controller
+        var url = "https://localhost:44321" + Url.Action("SendData", "Usuario");
+        var conteudo = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
-            // Envie a requisição POST para o endpoint
-            tasks.Add(httpClient.PostAsync(url, conteudo));
+        // Envie a requisição POST para o endpoint
+        tasks.Add(httpClient.PostAsync(url, conteudo));
 
-        Thread.Sleep(random.Next(10000));
+        Thread.Sleep(random.Next(60000));
     }
 }

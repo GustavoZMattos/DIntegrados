@@ -14,7 +14,6 @@ namespace DIntegrados.Controllers
 {
     public class UsuarioController : Controller
     {
-        private readonly HttpClient _httpClient;
         private readonly IWebHostEnvironment _env;
 
         public UsuarioController(IWebHostEnvironment env)
@@ -22,6 +21,7 @@ namespace DIntegrados.Controllers
             _env = env;
         }
 
+        #region desnecessario
         // GET: Usuario
         public ActionResult Index()
         {
@@ -102,6 +102,7 @@ namespace DIntegrados.Controllers
                 return View();
             }
         }
+        #endregion desnecessario
 
         [HttpPost]
         public async Task<IActionResult> SendData([FromBody] ModeloRecebeUser modelo)
@@ -140,19 +141,10 @@ namespace DIntegrados.Controllers
                 // Configure a URL do endpoint do controller
                 var url = "https://localhost:44321" + Url.Action("ReconstructImage", "Imagem");
                 var conteudo = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
-                var xxx = conteudo.ReadAsStringAsync();
+
                 // Envie a requisição POST para o endpoint
-                var response = await httpClient.PostAsync(url, conteudo);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    // Requisição bem-sucedida
-                }
-                else
-                {
-                    // Requisição falhou
-
-                }
+                httpClient.Timeout = TimeSpan.FromMinutes(30);
+                await httpClient.PostAsync(url, conteudo);
             }
         }
         public class ModeloRecebeUser

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
+using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using DotNumerics.LinearAlgebra;
 using Microsoft.AspNetCore.Hosting;
@@ -13,14 +15,15 @@ namespace DIntegrados.Controllers
 {
     public class ImagemController : Controller
     {
-        private Matrix H, g, x;
         private readonly IWebHostEnvironment _env;
+        static SemaphoreSlim memorySemaphore;
 
         public ImagemController(IWebHostEnvironment env)
         {
             _env = env;
         }
 
+        #region desnecessario
         // GET: Imagem
         public ActionResult Index()
         {
@@ -101,27 +104,29 @@ namespace DIntegrados.Controllers
                 return View();
             }
         }
+        #endregion desnecessario
 
         [HttpPost]
         public IActionResult ReconstructImage([FromBody] ModeloRecebeServer data)
         {
-            Stopwatch stopwatch = new Stopwatch();
-            stopwatch.Start();
-            ReconstructImageData(data.Sinal, data.Agoritimo.Split(' ')[0], out Matrix reconstructedImage, out int count); // Reconstrói a imagem
-            stopwatch.Stop();
-            SaveImage(reconstructedImage, data.Agoritimo, stopwatch.Elapsed.TotalSeconds, count); // Salva a imagem
+            memorySemaphore = new SemaphoreSlim(0, 3);
+
+            while (PodeProcessar(data))
+                ;
             return Ok();
         }
 
         private void ReconstructImageData(List<float> data, string alg, out Matrix x, out int count)
         {
-            int lin, col, s, n;
+            Matrix H, g;
+            int lin, col, s, n, h;
             if (data.Count == 50816)
             {
                 lin = 50816;
                 col = 3600;
                 s = 794;
                 n = 64;
+                h = 1;
             }
             else
             {
@@ -129,9 +134,10 @@ namespace DIntegrados.Controllers
                 col = 900;
                 s = 436;
                 n = 64;
+                h = 2;
             }
             H = new Matrix(lin, col);
-            string path = $"{_env.ContentRootPath}\\Data\\Arquivos\\H-1.csv";
+            string path = $"{_env.ContentRootPath}\\Data\\Arquivos\\H-{h}.csv";
             System.IO.StreamReader file = new System.IO.StreamReader(path);
             for (int i = 0; i < lin; i++)
             {
@@ -159,6 +165,7 @@ namespace DIntegrados.Controllers
                 x = new Matrix(1, 1);
                 count = 1;
             }
+            GC.Collect();
         }
 
         private void SaveImage(Matrix x, string alg, double tempo, int count)
@@ -188,6 +195,7 @@ namespace DIntegrados.Controllers
                     k++;
                 }
             bmp.Save($"{_env.ContentRootPath}\\Data\\Imagens\\Img{alg} U{User.Identity.Name} Tam{tam} Temp{Math.Round(tempo)} I{count}.bmp");
+            GC.Collect();
         }
 
         static float[] SoundGain(int l, int c, IList<float> sinal)
@@ -232,6 +240,7 @@ namespace DIntegrados.Controllers
                 }
             }
             return c;
+
         }
 
         static double norm2(Matrix matrix)
@@ -278,6 +287,7 @@ namespace DIntegrados.Controllers
                 rtXr = ritXri;
                 count++;
             } while (calculoErro > 0.0003f && count < 15);
+            GC.Collect();
         }
 
         static void CGNR(Matrix H, Matrix g, out Matrix f, out int count)
@@ -307,6 +317,49 @@ namespace DIntegrados.Controllers
                 calculoErro = Math.Abs(norm2(ri) - norm2(r));
                 count++;
             } while (calculoErro > 0.0003f && count < 15);
+            GC.Collect();
+        }
+
+        static double GetCurrentMemoryUsage()
+        {
+            var output = "";
+            Process currentProcess = Process.GetCurrentProcess();
+            var info = new ProcessStartInfo();
+            info.FileName = "wmic";
+            info.Arguments = "OS get FreePhysicalMemory,TotalVisibleMemorySize /Value";
+            info.RedirectStandardOutput = true;
+            using (var process = Process.Start(info))
+            {
+                output = process.StandardOutput.ReadToEnd();
+            }
+            var lines = output.Trim().Split("\n");
+            var totalMemoryParts = lines[1].Split("=", StringSplitOptions.RemoveEmptyEntries);
+            var memoriaTotal = Math.Round(double.Parse(totalMemoryParts[1]) / 1024, 0);
+            var memoriaUtilizada = currentProcess.WorkingSet64 / 100000;
+
+            // Calcular a porcentagem de memória utilizada
+            double memoryUsagePercentage = (memoriaUtilizada / memoriaTotal) * 100;
+
+            return memoryUsagePercentage;
+        }
+
+        public bool PodeProcessar(ModeloRecebeServer data)
+        {
+            if (GetCurrentMemoryUsage() < 25)
+            {
+                Stopwatch stopwatch = new Stopwatch();
+                stopwatch.Start();
+                ReconstructImageData(data.Sinal, data.Agoritimo.Split(' ')[0], out Matrix reconstructedImage, out int count); // Reconstrói a imagem
+                stopwatch.Stop();
+                SaveImage(reconstructedImage, data.Agoritimo, stopwatch.Elapsed.TotalSeconds, count); // Salva a imagem
+                memorySemaphore.Release();
+                return false;
+            }
+            else
+            {
+                memorySemaphore.Wait(30000);
+                return true;
+            }
         }
 
         public class ModeloRecebeServer
