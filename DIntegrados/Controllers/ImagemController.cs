@@ -16,7 +16,7 @@ namespace DIntegrados.Controllers
     public class ImagemController : Controller
     {
         private readonly IWebHostEnvironment _env;
-        static SemaphoreSlim memorySemaphore;
+        private static FifoSemaphore fifoSemaphore = new FifoSemaphore(3);
 
         public ImagemController(IWebHostEnvironment env)
         {
@@ -109,8 +109,6 @@ namespace DIntegrados.Controllers
         [HttpPost]
         public IActionResult ReconstructImage([FromBody] ModeloRecebeServer data)
         {
-            memorySemaphore = new SemaphoreSlim(0, 3);
-
             while (PodeProcessar(data))
                 ;
             return Ok();
@@ -151,7 +149,7 @@ namespace DIntegrados.Controllers
             float[] ultravector = SoundGain(s, n, data);
 
             g = new Matrix(lin, 1);
-            for (int i = 0; i < lin; i++)//constroi matrix do vetor de entrada
+            for (int i = 0; i < lin; i++)
             {
                 g[i, 0] = ultravector[i];
             }
@@ -170,7 +168,6 @@ namespace DIntegrados.Controllers
 
         private void SaveImage(Matrix x, string alg, double tempo, int count)
         {
-            //Parte que atribui valor de 0 até 255 para a imagem
             int tam;
             if (x.RowCount == 3600)
                 tam = 60;
@@ -178,7 +175,7 @@ namespace DIntegrados.Controllers
                 tam = 30;
             Bitmap bmp = new Bitmap(tam, tam);
             double max = double.NegativeInfinity, min = double.PositiveInfinity;
-            for (int i = 0; i < x.RowCount; i++)//Calcula valor máximo e mínimo da imagem
+            for (int i = 0; i < x.RowCount; i++)
             {
                 if (x[i, 0] > max)
                     max = x[i, 0];
@@ -223,7 +220,7 @@ namespace DIntegrados.Controllers
             return g;
 
         }
-        //serve pra multiplicar com transposta sem precisar alocar nova matrix na memória, por que da out of memory exception
+
         static Matrix MatrixMultTranpose(Matrix a, Matrix b)
         {
             int col = b.ColumnCount, row = a.ColumnCount;
@@ -254,12 +251,6 @@ namespace DIntegrados.Controllers
             return Math.Sqrt(somatorio);
         }
 
-        /*H é a matrix gigante de tramanho(50816, 3600), 
-         * g é o vetor de ultrasom passado de tamanho (50816, 1)
-         * f é a saida de tamanho (3600,1) que vai ser iniciada em 0
-         * O tamanho 50816 vem do tamannho do vetor de entrada
-         * O tamanho 3600 vem do tamanho da imagem final (60X60)
-         */
         static void CGNE(Matrix H, Matrix g, out Matrix f, out int count)
         {
             f = new Matrix(H.ColumnCount, 1);
@@ -336,8 +327,6 @@ namespace DIntegrados.Controllers
             var totalMemoryParts = lines[1].Split("=", StringSplitOptions.RemoveEmptyEntries);
             var memoriaTotal = Math.Round(double.Parse(totalMemoryParts[1]) / 1024, 0);
             var memoriaUtilizada = currentProcess.WorkingSet64 / 100000;
-
-            // Calcular a porcentagem de memória utilizada
             double memoryUsagePercentage = (memoriaUtilizada / memoriaTotal) * 100;
 
             return memoryUsagePercentage;
@@ -352,12 +341,12 @@ namespace DIntegrados.Controllers
                 ReconstructImageData(data.Sinal, data.Agoritimo.Split(' ')[0], out Matrix reconstructedImage, out int count); // Reconstrói a imagem
                 stopwatch.Stop();
                 SaveImage(reconstructedImage, data.Agoritimo, stopwatch.Elapsed.TotalSeconds, count); // Salva a imagem
-                memorySemaphore.Release();
+                fifoSemaphore.Release();
                 return false;
             }
             else
             {
-                memorySemaphore.Wait(30000);
+                fifoSemaphore.WaitAsync().GetAwaiter().GetResult();
                 return true;
             }
         }

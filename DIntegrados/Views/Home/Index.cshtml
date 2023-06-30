@@ -14,27 +14,28 @@
 </div>
 
 @{
+    var httpClient = new HttpClient();
+    var url = "https://localhost:44321" + Url.Action("SendData", "Usuario");
     var tasks = new List<Task>();
-
-    for (int i = 0; i < 10; i++)
-    {
-        List<string> sinal = new List<string>
+    var random = new Random();
+    List<string> sinal = new List<string>
         {
-            "G-1",
             "G-2",
+            "G-1",
             "A-60x60-1",
             "g-30x30-1",
             "g-30x30-2",
             "A-30x30-1"
         };
 
-        List<string> algoritimo = new List<string>
+    List<string> algoritimo = new List<string>
         {
             "CGNE",
             "CGNR"
         };
 
-        var random = new Random();
+    for (int i = 0; i < 10; i++)
+    {
         int indiceAleatorioSinal = random.Next(sinal.Count);
         int indiceAleatorioAlg = random.Next(algoritimo.Count);
 
@@ -44,11 +45,6 @@
             Agoritimo = algoritimo[indiceAleatorioAlg]
         };
 
-        // Crie uma instância do HttpClient
-        var httpClient = new HttpClient();
-
-        // Configure a URL do endpoint do controller
-        var url = "https://localhost:44321" + Url.Action("SendData", "Usuario");
         var conteudo = new StringContent(JsonConvert.SerializeObject(data), Encoding.UTF8, "application/json");
 
         // Envie a requisição POST para o endpoint
